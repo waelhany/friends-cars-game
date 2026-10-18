@@ -3,245 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>لعبة سيارات 3D</title>
+    <title>لعبة المزرعة القديمة - مطاردة وأسلحة 4K</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #000;
+            touch-action: none;
         }
         #canvas-container {
             width: 100vw;
             height: 100vh;
         }
-        /* أدوات التحكم للموبايل */
-        .controls {
+        .controls-layer {
             position: absolute;
-            bottom: 20px;
+            top: 0;
+            left: 0;
             width: 100%;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
+            height: 100%;
+            pointer-events: none;
             z-index: 10;
         }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
-        .btn {
-            width: 65px;
-            height: 65px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid #fff;
+        /* الدركسيون */
+        #steering-wheel {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            width: 130px;
+            height: 130px;
             border-radius: 50%;
+            border: 8px solid #2c3e50;
+            background: radial-gradient(circle, #555 20%, #111 80%);
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            pointer-events: auto;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #steering-wheel::before { content: ''; position: absolute; width: 100%; height: 10px; background: #333; }
+        #steering-wheel::after { content: ''; position: absolute; width: 10px; height: 100%; background: #333; }
+        .wheel-center { width: 35px; height: 35px; background: #e74c3c; border-radius: 50%; z-index: 2; border: 2px solid #fff; }
+
+        /* البدالات */
+        .pedal-group {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+        .pedal {
+            width: 55px;
+            height: 100px;
+            border-radius: 10px;
             color: white;
-            font-size: 24px;
+            font-size: 13px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.6);
             user-select: none;
-            touch-action: manipulation;
         }
-        .btn:active {
-            background: rgba(255, 255, 255, 0.7);
-        }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            text-align: center;
-            pointer-events: none;
-        }
-    </style>
-    <!-- استدعاء مكتبة Three.js للرسومات ثلاثية الأبعاد -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-</head>
-<body>
-
-    <div id="instructions">التحكم: الأسهم أو أزرار الشاشة</div>
-    <div id="canvas-container"></div>
-
-    <!-- أزرار التحكم باللمس للموبايل -->
-    <div class="controls">
-        <div class="btn-group">
-            <div class="btn" id="leftBtn">◀</div>
-            <div class="btn" id="rightBtn">▶</div>
-        </div>
-        <div class="btn-group">
-            <div class="btn" id="upBtn">▲</div>
-            <div class="btn" id="downBtn">▼</div>
-        </div>
-    </div>
-
-    <script>
-        // 1. إعداد المشهد والكاميرا
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // لون السماء
-
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-
-        // 2. الإضاءة
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(20, 40, 20);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // 3. إنشاء الطريق والأرضية
-        const roadGeometry = new THREE.PlaneGeometry(20, 1000);
-        const roadMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-        const road = new THREE.Mesh(roadGeometry, roadMaterial);
-        road.rotation.x = -Math.PI / 2;
-        road.receiveShadow = true;
-        scene.add(road);
-
-        // خطوط الطريق
-        for (let i = -500; i < 500; i += 20) {
-            const lineGeo = new THREE.PlaneGeometry(0.5, 8);
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const line = new THREE.Mesh(lineGeo, lineMat);
-            line.rotation.x = -Math.PI / 2;
-            line.position.set(0, 0.01, i);
-            scene.add(line);
-        }
-
-        // 4. إنشاء جسم السيارة
-        const car = new THREE.Group();
-
-        // هيكل السيارة
-        const bodyGeo = new THREE.BoxGeometry(2, 1, 4);
-        const bodyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 }); // لون احمر
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0.8;
-        body.castShadow = true;
-        car.add(body);
-
-        // سقف السيارة
-        const cabinGeo = new THREE.BoxGeometry(1.6, 0.8, 2);
-        const cabinMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
-        const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-        cabin.position.set(0, 1.5, -0.3);
-        car.add(cabin);
-
-        // العجلات
-        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
-        const wheelMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
-        const wheelPositions = [
-            [-1.1, 0.4, 1.2],
-            [1.1, 0.4, 1.2],
-            [-1.1, 0.4, -1.2],
-            [1.1, 0.4, -1.2]
-        ];
-
-        wheelPositions.forEach(pos => {
-            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-            wheel.rotation.z = Math.PI / 2;
-            wheel.position.set(...pos);
-            car.add(wheel);
-        });
-
-        scene.add(car);
-
-        // 5. متغيرات الحركة والتحكم
-        let speed = 0;
-        let maxSpeed = 0.8;
-        let accel = 0.015;
-        let friction = 0.008;
-        let angle = 0;
-
-        const keys = { forward: false, backward: false, left: false, right: false };
-
-        // أزرار الكيبورد
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w') keys.forward = true;
-            if (e.key === 'ArrowDown' || e.key === 's') keys.backward = true;
-            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
-            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w') keys.forward = false;
-            if (e.key === 'ArrowDown' || e.key === 's') keys.backward = false;
-            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
-            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
-        });
-
-        // أزرار اللمس للموبايل
-        const bindTouch = (id, key) => {
-            const btn = document.getElementById(id);
-            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
-            btn.addEventListener('mousedown', () => keys[key] = true);
-            btn.addEventListener('mouseup', () => keys[key] = false);
-        };
-
-        bindTouch('upBtn', 'forward');
-        bindTouch('downBtn', 'backward');
-        bindTouch('leftBtn', 'left');
-        bindTouch('rightBtn', 'right');
-
-        // 6. الحلقة الأساسية للعبة (Game Loop)
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // تسارع وفرملة
-            if (keys.forward) speed = Math.min(speed + accel, maxSpeed);
-            else if (keys.backward) speed = Math.max(speed - accel, -maxSpeed / 2);
-            else {
-                if (speed > 0) speed = Math.max(0, speed - friction);
-                if (speed < 0) speed = Math.min(0, speed + friction);
-            }
-
-            // التوجيه
-            if (speed !== 0) {
-                const dir = speed > 0 ? 1 : -1;
-                if (keys.left) angle += 0.03 * dir;
-                if (keys.right) angle -= 0.03 * dir;
-            }
-
-            // تحديث حركة السيارة
-            car.rotation.y = angle;
-            car.position.x -= Math.sin(angle) * speed;
-            car.position.z -= Math.cos(angle) * speed;
-
-            // تحديث مكان الكاميرا لتبع السيارة خلفها
-            const cameraOffset = new THREE.Vector3(
-                car.position.x + Math.sin(angle) * 12,
-                car.position.y + 6,
-                car.position.z + Math.cos(angle) * 12
-            );
-            camera.position.lerp(cameraOffset, 0.1);
-            camera.lookAt(car.position.x, car.position.y + 1, car.position.z);
-
-            renderer.render(scene, camera);
-        }
-
-        // ضبط حجم الشاشة عند التدوير
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        animate();
-    </script>
-</body>
-  </html>
-  
+        .pedal-gas { height: 120px; background: linear-gradient(to bottom, #27ae60, #1e8
+                                                                
